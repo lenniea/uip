@@ -55,4 +55,4 @@ $(OBJ_DIR)/lm32crt0ram.o : lm32crt0ram.s
 	lm32-elf-as $(ASMFLAGS) -o $@ $<
 
 clean:
-	$(RM) $(target) $(LIBOBJ) $(APPOBJ) $(LIBRARY) $(APP) $(HEX) $(MAP)
+	$(RM) $(target) $(OBJ_DIR)/lm32crt0ram.o $(LIBOBJ) $(APPOBJ) $(LIBRARY) $(APP) $(HEX) $(MAP) $(LST)
