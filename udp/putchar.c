@@ -2,7 +2,7 @@
 #undef putchar
 
 #define TRACE_BUF_SIZE		4096
-extern trace_buf[TRACE_BUF_SIZE];
+extern unsigned char trace_buf[TRACE_BUF_SIZE];
 
 short trace_index = 0;
 
