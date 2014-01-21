@@ -1066,7 +1066,7 @@ struct uip_udp_conn *uip_udp_new(uip_ipaddr_t *ripaddr, u16_t rport);
 #ifndef HTONS
 #   if UIP_BYTE_ORDER == UIP_BIG_ENDIAN
 #      define HTONS(n) (n)
-#   else /* UIP_BYTE_ORDER == UIP_BIG_ENDIAN */
+#   else /* UIP_BYTE_ORDER != UIP_BIG_ENDIAN */
 #      define HTONS(n) (u16_t)((((u16_t) (n)) << 8) | (((u16_t) (n)) >> 8))
 #   endif /* UIP_BYTE_ORDER == UIP_BIG_ENDIAN */
 #else
@@ -1080,12 +1080,21 @@ struct uip_udp_conn *uip_udp_new(uip_ipaddr_t *ripaddr, u16_t rport);
  * byte order to network byte order. For converting constants to
  * network byte order, use the HTONS() macro instead.
  */
+#if UIP_BYTE_ORDER == UIP_BIG_ENDIAN
+
+#define htons(x)    ((u16_t)(x))
+#define ntohs(x)    ((u16_t)(x))
+
+#else /* UIP_BYTE_ORDER != UIP_BIG_ENDIAN */
+
 #ifndef htons
 u16_t htons(u16_t val);
 #endif /* htons */
 #ifndef ntohs
 #define ntohs htons
 #endif
+
+#endif /* UIP_BYTE_ORDER == UIP_BIG_ENDIAN */
 
 /** @} */
 
@@ -1139,6 +1148,7 @@ extern u16_t uip_len;
 extern u16_t uip_urglen, uip_surglen;
 #endif /* UIP_URGDATA > 0 */
 
+#if UIP_CONNS > 0
 
 /**
  * Representation of a uIP TCP connection.
@@ -1190,6 +1200,9 @@ struct uip_conn {
 extern struct uip_conn *uip_conn;
 /* The array containing all uIP connections. */
 extern struct uip_conn uip_conns[UIP_CONNS];
+
+#endif
+
 /**
  * \addtogroup uiparch
  * @{

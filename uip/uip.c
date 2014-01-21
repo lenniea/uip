@@ -1,5 +1,3 @@
-#define DEBUG_PRINTF(...) /*printf(__VA_ARGS__)*/
-
 /**
  * \defgroup uip The uIP TCP/IP stack
  * @{
@@ -82,12 +80,23 @@
 #include "uip.h"
 #include "uipopt.h"
 #include "uip_arch.h"
+#include "uip_arp.h"
 
 #if UIP_CONF_IPV6
 #include "uip-neighbor.h"
 #endif /* UIP_CONF_IPV6 */
 
 #include <string.h>
+
+//#define _DEBUG  1
+
+#ifdef _DEBUG
+  #define DEBUG_PRINTF2(s,a)    printf((s),(a))
+  #define DEBUG_PRINTF3(s,a,b)  printf((s),(a),(b))
+#else
+  #define DEBUG_PRINTF2(s,a)
+  #define DEBUG_PRINTF3(s,a,b)
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Variable definitions. */
@@ -183,10 +192,10 @@ void uip_setipid(u16_t id) { ipid = id; }
 static u8_t iss[4];          /* The iss variable is used for the TCP
 				initial sequence number. */
 
-#if UIP_ACTIVE_OPEN
+#if UIP_ACTIVE_OPEN || UIP_UDP
 static u16_t lastport;       /* Keeps track of the last port used for
 				a new connection. */
-#endif /* UIP_ACTIVE_OPEN */
+#endif /* UIP_ACTIVE_OPEN || UIP_UDP */
 
 /* Temporary variables. */
 u8_t uip_acc32[4];
@@ -320,7 +329,7 @@ uip_ipchksum(void)
   u16_t sum;
 
   sum = chksum(0, &uip_buf[UIP_LLH_LEN], UIP_IPH_LEN);
-  DEBUG_PRINTF("uip_ipchksum: sum 0x%04x\n", sum);
+  DEBUG_PRINTF2("uip_ipchksum: sum 0x%04x\n", sum);
   return (sum == 0) ? 0xffff : htons(sum);
 }
 #endif
@@ -384,7 +393,7 @@ uip_init(void)
   for(c = 0; c < UIP_CONNS; ++c) {
     uip_conns[c].tcpstateflags = UIP_CLOSED;
   }
-#if UIP_ACTIVE_OPEN
+#if UIP_ACTIVE_OPEN || UIP_UDP
   lastport = 1024;
 #endif /* UIP_ACTIVE_OPEN */
 
@@ -697,7 +706,9 @@ uip_process(u8_t flag)
     if((uip_connr->tcpstateflags & UIP_TS_MASK) == UIP_ESTABLISHED &&
        !uip_outstanding(uip_connr)) {
 	uip_flags = UIP_POLL;
+#ifdef UIP_APPCALL
 	UIP_APPCALL();
+#endif
 	goto appsend;
     }
     goto drop;
@@ -748,7 +759,9 @@ uip_process(u8_t flag)
 	       UIP_TIMEDOUT to inform the application that the
 	       connection has timed out. */
 	    uip_flags = UIP_TIMEDOUT;
+#ifdef UIP_APPCALL
 	    UIP_APPCALL();
+#endif
 
 	    /* We also send a reset packet to the remote host. */
 	    BUF->flags = TCP_RST | TCP_ACK;
@@ -787,7 +800,9 @@ uip_process(u8_t flag)
                the code for sending out the packet (the apprexmit
                label). */
 	    uip_flags = UIP_REXMIT;
+#ifdef UIP_APPCALL
 	    UIP_APPCALL();
+#endif
 	    goto apprexmit;
 	    
 	  case UIP_FIN_WAIT_1:
@@ -802,7 +817,9 @@ uip_process(u8_t flag)
 	/* If there was no need for a retransmission, we poll the
            application for new data. */
 	uip_flags = UIP_POLL;
+#ifdef UIP_APPCALL
 	UIP_APPCALL();
+#endif
 	goto appsend;
       }
     }
@@ -907,7 +924,7 @@ uip_process(u8_t flag)
     /* If IP broadcast support is configured, we check for a broadcast
        UDP packet, which may be destined to us. */
 #if UIP_BROADCAST
-    DEBUG_PRINTF("UDP IP checksum 0x%04x\n", uip_ipchksum());
+    DEBUG_PRINTF2("UDP IP checksum 0x%04x\n", uip_ipchksum());
     if(BUF->proto == UIP_PROTO_UDP &&
        uip_ipaddr_cmp(BUF->destipaddr, all_ones_addr)
        /*&&
@@ -1006,13 +1023,15 @@ uip_process(u8_t flag)
   uip_ipaddr_copy(BUF->srcipaddr, uip_hostaddr);
 
   UIP_STAT(++uip_stat.icmp.sent);
+  uip_len += sizeof(struct uip_eth_hdr);
+  DEBUG_PRINTF3("ICMP_ECHO #%u len=%d\n", uip_stat.icmp.sent, uip_len);
   goto send;
 
   /* End of IPv4 input header processing code. */
 #else /* !UIP_CONF_IPV6 */
 
   /* This is IPv6 ICMPv6 processing code. */
-  DEBUG_PRINTF("icmp6_input: length %d\n", uip_len);
+  DEBUG_PRINTF2("icmp6_input: length %d\n", uip_len);
 
   if(BUF->proto != UIP_PROTO_ICMP6) { /* We only allow ICMPv6 packets from
 					 here. */
@@ -1067,7 +1086,7 @@ uip_process(u8_t flag)
     UIP_STAT(++uip_stat.icmp.sent);
     goto send;
   } else {
-    DEBUG_PRINTF("Unknown icmp6 message type %d\n", ICMPBUF->type);
+    DEBUG_PRINTF2("Unknown icmp6 message type %d\n", ICMPBUF->type);
     UIP_STAT(++uip_stat.icmp.drop);
     UIP_STAT(++uip_stat.icmp.typeerr);
     UIP_LOG("icmp: unknown ICMP message.");
@@ -1150,11 +1169,31 @@ uip_process(u8_t flag)
   UDPBUF->udplen = HTONS(uip_slen + UIP_UDPH_LEN);
   UDPBUF->udpchksum = 0;
 
+  if (uip_udp_conn->rport == 0)
+  {
+#define ETHBUF ((struct uip_eth_hdr *)&uip_buf[0])
+    /* swap UDP "reply" mac dst,src addrs */
+    memcpy(ETHBUF->dest.addr, ETHBUF->src.addr, 6);
+    memcpy(ETHBUF->src.addr, uip_ethaddr.addr, 6);
+	/* UDP "reply" port */
+	BUF->destport = BUF->srcport;
+  }
+  else
+  {
+    BUF->destport = uip_udp_conn->rport;
+  }
   BUF->srcport  = uip_udp_conn->lport;
-  BUF->destport = uip_udp_conn->rport;
-
+  
+  /* Swap IP addresses. */
+  if (uip_ipaddr_cmp(uip_udp_conn->ripaddr, all_ones_addr))
+  {
+   	uip_ipaddr_copy(BUF->destipaddr, BUF->srcipaddr);
+  }
+  else
+  {
+    uip_ipaddr_copy(BUF->destipaddr, uip_udp_conn->ripaddr);
+  }
   uip_ipaddr_copy(BUF->srcipaddr, uip_hostaddr);
-  uip_ipaddr_copy(BUF->destipaddr, uip_udp_conn->ripaddr);
    
   uip_appdata = &uip_buf[UIP_LLH_LEN + UIP_IPTCPH_LEN];
 
@@ -1165,7 +1204,7 @@ uip_process(u8_t flag)
     UDPBUF->udpchksum = 0xffff;
   }
 #endif /* UIP_UDP_CHECKSUMS */
-  
+  uip_len += sizeof(struct uip_eth_hdr);
   goto ip_send_nolen;
 #endif /* UIP_UDP */
   
@@ -1390,7 +1429,9 @@ uip_process(u8_t flag)
     uip_connr->tcpstateflags = UIP_CLOSED;
     UIP_LOG("tcp: got reset, aborting connection.");
     uip_flags = UIP_ABORT;
+#ifdef UIP_APPCALL
     UIP_APPCALL();
+#endif
     goto drop;
   }
   /* Calculated the length of the data, if the application has sent
@@ -1479,7 +1520,9 @@ uip_process(u8_t flag)
         uip_add_rcv_nxt(uip_len);
       }
       uip_slen = 0;
+#ifdef UIP_APPCALL
       UIP_APPCALL();
+#endif
       goto appsend;
     }
     goto drop;
@@ -1534,7 +1577,9 @@ uip_process(u8_t flag)
       uip_connr->len = 0;
       uip_len = 0;
       uip_slen = 0;
+#ifdef UIP_APPCALL
       UIP_APPCALL();
+#endif
       goto appsend;
     }
     /* Inform the application that the connection failed */
@@ -1566,7 +1611,9 @@ uip_process(u8_t flag)
       if(uip_len > 0) {
 	uip_flags |= UIP_NEWDATA;
       }
+#ifdef UIP_APPCALL
       UIP_APPCALL();
+#endif
       uip_connr->len = 1;
       uip_connr->tcpstateflags = UIP_LAST_ACK;
       uip_connr->nrtx = 0;
@@ -1643,7 +1690,9 @@ uip_process(u8_t flag)
        send, uip_len must be set to 0. */
     if(uip_flags & (UIP_NEWDATA | UIP_ACKDATA)) {
       uip_slen = 0;
+#ifdef UIP_APPCALL
       UIP_APPCALL();
+#endif
 
     appsend:
       
@@ -1724,8 +1773,10 @@ uip_process(u8_t flag)
     if(uip_flags & UIP_ACKDATA) {
       uip_connr->tcpstateflags = UIP_CLOSED;
       uip_flags = UIP_CLOSE;
+#ifdef UIP_APPCALL
       UIP_APPCALL();
-    }
+#endif
+	  }
     break;
     
   case UIP_FIN_WAIT_1:
@@ -1745,7 +1796,9 @@ uip_process(u8_t flag)
       }
       uip_add_rcv_nxt(1);
       uip_flags = UIP_CLOSE;
+#ifdef UIP_APPCALL
       UIP_APPCALL();
+#endif
       goto tcp_send_ack;
     } else if(uip_flags & UIP_ACKDATA) {
       uip_connr->tcpstateflags = UIP_FIN_WAIT_2;
@@ -1766,7 +1819,9 @@ uip_process(u8_t flag)
       uip_connr->timer = 0;
       uip_add_rcv_nxt(1);
       uip_flags = UIP_CLOSE;
+#ifdef UIP_APPCALL
       UIP_APPCALL();
+#endif
       goto tcp_send_ack;
     }
     if(uip_len > 0) {
@@ -1860,12 +1915,12 @@ uip_process(u8_t flag)
   /* Calculate IP checksum. */
   BUF->ipchksum = 0;
   BUF->ipchksum = ~(uip_ipchksum());
-  DEBUG_PRINTF("uip ip_send_nolen: chkecum 0x%04x\n", uip_ipchksum());
+  DEBUG_PRINTF2("uip ip_send_nolen: chksum 0x%04x\n", uip_ipchksum());
 #endif /* UIP_CONF_IPV6 */
    
   UIP_STAT(++uip_stat.tcp.sent);
  send:
-  DEBUG_PRINTF("Sending packet with length %d (%d)\n", uip_len,
+  DEBUG_PRINTF3("Sending packet with length %d (%d)\n", uip_len,
 	       (BUF->len[0] << 8) | BUF->len[1]);
   
   UIP_STAT(++uip_stat.ip.sent);
@@ -1878,11 +1933,17 @@ uip_process(u8_t flag)
   return;
 }
 /*---------------------------------------------------------------------------*/
+
+#if UIP_BYTE_ORDER != UIP_BIG_ENDIAN
+
 u16_t
 htons(u16_t val)
 {
   return HTONS(val);
 }
+
+#endif
+
 /*---------------------------------------------------------------------------*/
 void
 uip_send(const void *data, int len)

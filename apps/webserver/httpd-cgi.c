@@ -54,6 +54,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(_MSC_VER)
+#define snprintf    _snprintf
+#endif
+
 HTTPD_CGI_CALL(file, "file-stats", file_stats);
 HTTPD_CGI_CALL(tcp, "tcp-connections", tcp_stats);
 HTTPD_CGI_CALL(net, "net-stats", net_stats);

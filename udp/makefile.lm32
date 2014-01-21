@@ -1,0 +1,58 @@
+##
+## makefile.lm32 - uIp TCP/IP library
+##
+## Lattice Mico32 makefile
+##
+## Copyright (c) FLIR Systems, Inc.  All Rights Reserved
+##
+
+OBJ_DIR = .
+SRC_DIR = ../uip
+APP_DIR = ../apps/udpserver
+
+LIB_DIR = C:/LatticeMico32/micosystem/gtools/lib/gcc/lm32-elf/3.4.4/mmultiply-enabled/mbarrel-shift-enabled
+
+ASMFLAGS = -D -mmultiply-enabled -mbarrel-shift-enabled
+CFLAGS = -s -g -Wall -I. -I$(SRC_DIR) -Os -fomit-frame-pointer -fno-builtin-printf -mmultiply-enabled -mbarrel-shift-enabled -ffunction-sections -D_MICO32 -DBIG_ENDIAN_MACHINE -DADDR_ETH_START=0xF0010000 -DFPGA_BASE=0xF0000000
+#LFLAGS = -L . -L $(LIB_DIR) -lm -lc -lgcc -G4 -gc-sections -T lm32_link.ld
+LFLAGS = -L . -L $(LIB_DIR) -lgcc -G4 -gc-sections -T lm32_link.ld
+
+LIBRARY = $(OBJ_DIR)/libuip.a
+LIBOBJ = $(OBJ_DIR)/psock.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/uip.o $(OBJ_DIR)/uip_arp.o $(OBJ_DIR)/uip-fw.o $(OBJ_DIR)/uiplib.o
+
+APP = $(OBJ_DIR)/udpserver.elf
+MAP = $(OBJ_DIR)/udpserver.map
+LST = $(OBJ_DIR)/udpserver.lst
+HEX = $(OBJ_DIR)/udpserver.hex
+
+APPOBJ = $(OBJ_DIR)/main.o $(OBJ_DIR)/oc_ether.o $(OBJ_DIR)/udpserver.o $(OBJ_DIR)/udpcam.o $(OBJ_DIR)/printf.o $(OBJ_DIR)/putchar.o
+
+.PHONY: all clean
+
+all: $(LIBRARY) $(OBJ_DIR)/lm32crt0ram.o $(APP) $(HEX) $(LST)
+
+$(APP) : $(APPOBJ) $(LIBRARY)
+	lm32-elf-ld -defsym eth_data=0x23FF0000 -defsym trace_buf=0x23FF8000 -Map $(MAP) -o $@ $^ $(LFLAGS)
+	
+$(HEX) : $(APP)
+	lm32-elf-objcopy -F ihex -R .vectors.reset -R .vectors.sw_exception -R .vectors.interrupt -R .vectors.hw_exception $< $@
+
+$(LST) : $(APP)
+	lm32-elf-objdump -dS $< > $@
+
+$(LIBRARY): $(LIBOBJ)
+	$(RM) $@
+	ar -frsv $@ $^
+	ranlib $@
+
+$(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
+	lm32-elf-gcc $(CFLAGS) -o $@ -c $<
+
+$(OBJ_DIR)/%.o : $(APP_DIR)/%.c
+	lm32-elf-gcc $(CFLAGS) -I $(APP_DIR) -o $@ -c $<
+
+$(OBJ_DIR)/lm32crt0ram.o : lm32crt0ram.s
+	lm32-elf-as $(ASMFLAGS) -o $@ $<
+
+clean:
+	$(RM) $(target) $(LIBOBJ) $(APPOBJ) $(LIBRARY) $(APP) $(HEX) $(MAP)
