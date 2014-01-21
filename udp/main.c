@@ -38,6 +38,13 @@
 #include "uip_arp.h"
 #include "oc_ether.h"
 
+#ifdef _WEBSERVER
+  #include "httpd.h"
+#endif
+#ifdef _UDPSERVER
+  #include "udpserver.h"
+#endif
+
 #include "timer.h"
 
 //#define _DEBUG  1
@@ -229,21 +236,13 @@ main(int argc, const char* argv[])
   uip_ipaddr(ipaddr, 255,255,255,0);
   uip_setnetmask(ipaddr);
 
+#ifdef _WEBSERVER
+  httpd_init();
+#endif
+#ifdef _UDPSERVER
   udpserver_init();
-
-#if 0
-  /* Test create broadcast packet */
-  memcpy(BUF->dest.addr, "\xFF\xFF\xFF\xFF\xFF\xFF", 6);
-  memcpy(BUF->src.addr, mac.addr, 6);
-  BUF->type = HTONS(0x88B5);
-  for (i = 0; i < 100; ++i)
-  {
-	uip_buf[i + 16] = i;
-  }
-  eth_tx(uip_buf, 116);
 #endif
 
-  
   for (;;)
   {
     uip_len = eth_rx(uip_buf, UIP_BUFSIZE);

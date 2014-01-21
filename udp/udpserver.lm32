@@ -1,7 +1,7 @@
 ##
-## makefile.lm32 - uIp TCP/IP library
+## udpserver.lm32 - uIp TCP/IP library
 ##
-## Lattice Mico32 makefile
+## Lattice Mico32 udpserver makefile
 ##
 ## Copyright (c) FLIR Systems, Inc.  All Rights Reserved
 ##
@@ -13,7 +13,7 @@ APP_DIR = ../apps/udpserver
 LIB_DIR = C:/LatticeMico32/micosystem/gtools/lib/gcc/lm32-elf/3.4.4/mmultiply-enabled/mbarrel-shift-enabled
 
 ASMFLAGS = -D -mmultiply-enabled -mbarrel-shift-enabled
-CFLAGS = -s -g -Wall -I. -I$(SRC_DIR) -Os -fomit-frame-pointer -fno-builtin-printf -mmultiply-enabled -mbarrel-shift-enabled -ffunction-sections -D_MICO32 -DBIG_ENDIAN_MACHINE -DADDR_ETH_START=0xF0010000 -DFPGA_BASE=0xF0000000
+CFLAGS = -s -g -Wall -I. -I$(SRC_DIR) -I$(APP_DIR) -Os -fomit-frame-pointer -fno-builtin-printf -mmultiply-enabled -mbarrel-shift-enabled -ffunction-sections -D_MICO32 -DBIG_ENDIAN_MACHINE -DADDR_ETH_START=0xF0010000 -DFPGA_BASE=0xF0000000 -D_UDPSERVER
 #LFLAGS = -L . -L $(LIB_DIR) -lm -lc -lgcc -G4 -gc-sections -T lm32_link.ld
 LFLAGS = -L . -L $(LIB_DIR) -lgcc -G4 -gc-sections -T lm32_link.ld
 

@@ -135,7 +135,11 @@ typedef unsigned short uip_stats_t;
  *
  * \hideinitializer
  */
-#define UIP_CONF_UDP             1
+#if defined(_UDPSERVER)
+  #define UIP_CONF_UDP             1
+#else
+  #define UIP_CONF_UDP             0
+#endif
 
 /**
  * UDP checksums on or off
@@ -153,7 +157,12 @@ typedef unsigned short uip_stats_t;
 
 /* Here we include the header file for the application(s) we use in
    our project. */
+#ifdef _UDPSERVER
 #include "../apps/udpserver/udpserver.h"
+#endif
+#ifdef _WEBSERVER
+#include "../apps/webserver/webserver.h"
+#endif
 
 #endif /* __UIP_CONF_H__ */
 
