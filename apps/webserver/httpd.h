@@ -37,9 +37,10 @@
 
 #include "psock.h"
 #include "httpd-fs.h"
+#include "timer.h"
 
 struct httpd_state {
-  unsigned char timer;
+  struct timer timer;
   struct psock sin, sout;
   struct pt outputpt, scriptpt;
   char inputbuf[50];

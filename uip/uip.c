@@ -91,8 +91,8 @@
 //#define _DEBUG  1
 
 #ifdef _DEBUG
-  #define DEBUG_PRINTF2(s,a)    printf((s),(a))
-  #define DEBUG_PRINTF3(s,a,b)  printf((s),(a),(b))
+  #define DEBUG_PRINTF2(s,a)    printf(s,a)
+  #define DEBUG_PRINTF3(s,a,b)  printf(s,a,b)
 #else
   #define DEBUG_PRINTF2(s,a)
   #define DEBUG_PRINTF3(s,a,b)
@@ -1916,6 +1916,7 @@ uip_process(u8_t flag)
   BUF->ipchksum = 0;
   BUF->ipchksum = ~(uip_ipchksum());
   DEBUG_PRINTF2("uip ip_send_nolen: chksum 0x%04x\n", uip_ipchksum());
+  uip_len += sizeof(struct uip_eth_hdr);
 #endif /* UIP_CONF_IPV6 */
    
   UIP_STAT(++uip_stat.tcp.sent);

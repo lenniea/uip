@@ -54,8 +54,18 @@
 #include <stdio.h>
 #include <string.h>
 
-#if defined(_MSC_VER)
-#define snprintf    _snprintf
+//#define _DEBUG      1
+
+#ifdef _DEBUG
+    #include <stdio.h>
+    #define DEBUG_PRINTF(s)		printf(s)
+    #define DEBUG_PRINTF1(s,a)		printf(s,a)
+    #define DEBUG_PRINTF2(s,a,b)	printf(s,a,b)
+    #define DEBUG_PRINTF3(s,a,b,c)	printf(s,a,b,c)
+#else
+    #define DEBUG_PRINTF(s)
+    #define DEBUG_PRINTF1(s,a)
+    #define DEBUG_PRINTF2(s,a,b)
 #endif
 
 HTTPD_CGI_CALL(file, "file-stats", file_stats);
@@ -90,7 +100,13 @@ static unsigned short
 generate_file_stats(void *arg)
 {
   char *f = (char *)arg;
-  return snprintf((char *)uip_appdata, UIP_APPDATA_SIZE, "%5u", httpd_fs_count(f));
+#ifdef HAVE_SNPRINTF
+  unsigned short len = snprintf((char *)uip_appdata, UIP_APPDATA_SIZE, "%5u", httpd_fs_count(f));
+#else
+  unsigned short len = sprintf((char *)uip_appdata, "%5u", httpd_fs_count(f));
+#endif
+  DEBUG_PRINTF2("file_stats(%s)=%u\n", uip_appdata, len);
+  return len;
 }
 /*---------------------------------------------------------------------------*/
 static
@@ -149,7 +165,11 @@ generate_tcp_stats(void *arg)
   struct httpd_state *s = (struct httpd_state *)arg;
     
   conn = &uip_conns[s->count];
+#ifdef HAVE_SNPRINTF
   return snprintf((char *)uip_appdata, UIP_APPDATA_SIZE,
+#else
+  return sprintf((char *)uip_appdata,
+#endif
 		 "<tr><td>%d</td><td>%u.%u.%u.%u:%u</td><td>%s</td><td>%u</td><td>%u</td><td>%c %c</td></tr>\r\n",
 		 htons(conn->lport),
 		 htons(conn->ripaddr[0]) >> 8,
@@ -183,7 +203,12 @@ static unsigned short
 generate_net_stats(void *arg)
 {
   struct httpd_state *s = (struct httpd_state *)arg;
+
+#ifdef HAVE_SNPRINTF
   return snprintf((char *)uip_appdata, UIP_APPDATA_SIZE,
+#else
+  return sprintf((char *)uip_appdata,
+#endif
 		  "%5u\n", ((uip_stats_t *)&uip_stat)[s->count]);
 }
 

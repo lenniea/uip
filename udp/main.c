@@ -95,36 +95,49 @@ int atexit( void (*func )( void ) )
 
 void *memcpy(void* dst, const void* src, size_t count)
 {
-	register void* p = (short*) dst;
-    if ((((uint32_t) p | (uint32_t) src | count) & 3) == 0)
+    register void* p = (short*) dst;
+    const size_t align = (size_t) p | (size_t) src | count;
+    if ((align & 3) == 0)
     {
-        while (((int32_t) (count -= 4)) >= 0)
+        while (count != 0)
         {
             *(int32_t*) p = *(const int32_t*) src;
             src = (const int32_t*) src + 1;
             p = (int32_t*) p + 1;
+            count -= 4;
         }
     }
-	else
+    else if ((align & 1) == 0)
+    {
+        while (count != 0)
 	{
-		while (((int32_t) (count -= 2)) >= 0)
-		{
-			*(int16_t*) p = *(const int16_t*) src;
-			src = (const int16_t*) src + 1;
-			p = (int16_t*) p + 1;
-		}
+	    *(int16_t*) p = *(const int16_t*) src;
+	    src = (const int16_t*) src + 1;
+	    p = (int16_t*) p + 1;
+            count -= 2;
 	}
-	return dst;
+    }
+    else
+    {
+        while (count != 0)
+        {
+            *(char*) p = *(const char*) src;
+            src = (const char*) src + 1;
+            p = (const char*) p + 1;
+            --count;
+        }
+    }
+    return dst;
 }
 
 void *memset(void* p, int c, size_t count)
 {
-	count = (count + 1) & ~1;
+    count = (count + 1) & ~1;
     while (count > 1) {
-	  *(short*) p = c;
-	  p = (short*) p + 1;
-	  count -= sizeof(short);
-	}
+	*(short*) p = c;
+	p = (short*) p + 1;
+	count -= sizeof(short);
+    }
     return p;
 }
 
@@ -186,12 +199,12 @@ void divide_by_zero_handler(void)
 
 void wait(unsigned short msec)
 {
-	clock_time_t now = clock_time();
-	const clock_time_t delay = msec * (CLOCK_SECOND / 1000);
-	clock_time_t elapsed;
-	do
-		elapsed = clock_time() - now;
-	while (elapsed < delay);
+    clock_time_t now = clock_time();
+    const clock_time_t delay = msec * (CLOCK_SECOND / 1000);
+    clock_time_t elapsed;
+    do
+	elapsed = clock_time() - now;
+    while (elapsed < delay);
 }
 
 #endif
@@ -275,6 +288,7 @@ main(int argc, const char* argv[])
 	   should be sent out on the network, the global variable
 	   uip_len is set to a value > 0. */
 	if(uip_len > 0) {
+      uip_arp_out();
 	  eth_tx(uip_buf, uip_len);
 	}
       }
@@ -287,6 +301,7 @@ main(int argc, const char* argv[])
 	   should be sent out on the network, the global variable
 	   uip_len is set to a value > 0. */
 	if(uip_len > 0) {
+      uip_arp_out();
 	  eth_tx(uip_buf, uip_len);
 	}
       }

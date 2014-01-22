@@ -60,8 +60,23 @@
 #include "httpd-fs.h"
 #include "httpd-cgi.h"
 #include "http-strings.h"
+#include "timer.h"
 
 #include <string.h>
+
+//#define _DEBUG      1
+
+#ifdef _DEBUG
+    #include <stdio.h>
+    #define DEBUG_PRINTF(s)		printf(s)
+    #define DEBUG_PRINTF1(s,a)		printf(s,a)
+    #define DEBUG_PRINTF2(s,a,b)	printf(s,a,b)
+    #define DEBUG_PRINTF3(s,a,b,c)	printf(s,a,b,c)
+#else
+    #define DEBUG_PRINTF(s)
+    #define DEBUG_PRINTF1(s,a)
+    #define DEBUG_PRINTF2(s,a,b)
+#endif
 
 #define STATE_WAITING 0
 #define STATE_OUTPUT  1
@@ -219,6 +234,7 @@ PT_THREAD(handle_output(struct httpd_state *s))
   char *ptr;
   
   PT_BEGIN(&s->outputpt);
+  DEBUG_PRINTF1("handle_output file=%s\n", s->filename);
  
   if(!httpd_fs_open(s->filename, &s->file)) {
     httpd_fs_open(http_404_html, &s->file);
@@ -252,6 +268,7 @@ PT_THREAD(handle_input(struct httpd_state *s))
 
   PSOCK_READTO(&s->sin, ISO_space);
 
+  DEBUG_PRINTF1("handle_input inp=%s\n", s->inputbuf);
   
   if(strncmp(s->inputbuf, http_get, 4) != 0) {
     PSOCK_CLOSE_EXIT(&s->sin);
@@ -305,17 +322,14 @@ httpd_appcall(void)
     PSOCK_INIT(&s->sout, s->inputbuf, sizeof(s->inputbuf) - 1);
     PT_INIT(&s->outputpt);
     s->state = STATE_WAITING;
-    /*    timer_set(&s->timer, CLOCK_SECOND * 100);*/
-    s->timer = 0;
+    timer_set(&s->timer, CLOCK_SECOND * 20);
     handle_connection(s);
   } else if(s != NULL) {
     if(uip_poll()) {
-      ++s->timer;
-      if(s->timer >= 20) {
+      if(timer_expired(&(s->timer))) {
+        DEBUG_PRINTF("TIMER_EXPIRED: aborting\n");
 	uip_abort();
       }
-    } else {
-      s->timer = 0;
     }
     handle_connection(s);
   } else {

@@ -5,12 +5,12 @@
 
 #ifdef _DEBUG
   #define DEBUG_PRINTF(s)       fprintf(stderr, s)
-  #define DEBUG_PRINTF2(s,a)    fprintf(stderr, s,a)
-  #define DEBUG_PRINTF3(s,a,b)  fprintf(stderr, s,a,b)
+  #define DEBUG_PRINTF1(s,a)    fprintf(stderr, s,a)
+  #define DEBUG_PRINTF2(s,a,b)  fprintf(stderr, s,a,b)
 #else
   #define DEBUG_PRINTF(s)
-  #define DEBUG_PRINTF2(s,a)
-  #define DEBUG_PRINTF3(s,a,b)
+  #define DEBUG_PRINTF1(s,a)
+  #define DEBUG_PRINTF2(s,a,b)
 #endif
 
 #define UDP_SERVER_PORT		8080
@@ -41,9 +41,9 @@ void udpserver_app(void) {
     short func = ntohs(data[0]);
     short count = uip_len - sizeof(short);
     short result = CamCommand(func, count, data + 1);
-#ifdef _DEBUG
-	fprintf(stderr, "=d\n", result);
-#endif
+
+    DEBUG_PRINTF1("=d\n", result);
+
     data[0] = htons(result);
     uip_udp_send((result < 0) ? sizeof(short) : result + sizeof(short));
   }
