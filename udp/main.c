@@ -95,50 +95,64 @@ int atexit( void (*func )( void ) )
 
 void *memcpy(void* dst, const void* src, size_t count)
 {
-    register void* p = (short*) dst;
-    const size_t align = (size_t) p | (size_t) src | count;
-    if ((align & 3) == 0)
+    const size_t align = (size_t) dst | (size_t) src | count;
+    if (count != 0)
     {
-        while (count != 0)
+        if ((align & 3) == 0)
         {
-            *(int32_t*) p = *(const int32_t*) src;
-            src = (const int32_t*) src + 1;
-            p = (int32_t*) p + 1;
-            count -= 4;
+            register int32_t* p = dst;
+            do
+            {
+                *p++ = *(const int32_t*) src;
+                src = (const int32_t*) src + 1;
+            }
+            while ((count -= 4) != 0);
         }
-    }
-    else if ((align & 1) == 0)
-    {
-        while (count != 0)
-	{
-	    *(int16_t*) p = *(const int16_t*) src;
-	    src = (const int16_t*) src + 1;
-	    p = (int16_t*) p + 1;
-            count -= 2;
-	}
-    }
-    else
-    {
-        while (count != 0)
+        else if ((align & 1) == 0)
         {
-            *(char*) p = *(const char*) src;
-            src = (const char*) src + 1;
-            p = (const char*) p + 1;
-            --count;
+            register int16_t* p = dst;
+            do
+            {
+                *p++ = *(const int16_t*) src;
+                src = (const int16_t*) src + 1;
+            }
+            while ((count -= 2) != 0);
+        }
+        else
+        {
+            register char* p = dst;
+            do
+            {
+                *p++ = *(const char*) src;
+                src = (const char*) src + 1;
+            }
+            while (--count != 0);
         }
     }
     return dst;
 }
 
-void *memset(void* p, int c, size_t count)
+void *memset(void* dst, int c, size_t count)
 {
-    count = (count + 1) & ~1;
-    while (count > 1) {
-	*(short*) p = c;
-	p = (short*) p + 1;
-	count -= sizeof(short);
+    if (count != 0)
+    {
+        const size_t align = (size_t) dst | count;
+        if ((align & 1) == 0)
+        {
+            short* p = dst;
+            do
+                *p++ = c;
+            while ((count -= 2) != 0);
+        }
+        else
+        {
+            char* p = dst;
+            do
+                *p++ = c;
+            while (--count != 0);
+        }
     }
-    return p;
+    return dst;
 }
 
 void exit( int status )
